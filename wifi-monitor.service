@@ -1,0 +1,11 @@
+[Unit]
+Description=Wifi scan daemon
+
+[Service]
+Type=forking
+ExecStart=/usr/sbin/wifi-monitor -d
+User=root
+ExecReload=/bin/kill -INT $MAINPID
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,5 @@
+*.o
+wifi-monitor
+client
+*.swp
+*.orig

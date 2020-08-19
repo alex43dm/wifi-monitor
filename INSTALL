@@ -1,0 +1,21 @@
+For docker:
+docker pull kalilinux/kali-rolling
+docker run -t -i kalilinux/kali-rolling /bin/bash
+apt-get update && apt-get install metasploit-framework
+
+Common install on Kali:
+apt-get install aircrack-ng
+apt-get install network-manager
+apt-get install libnm-dev
+apt-get install iproute2
+apt-get install iw
+
+git clone https://github.com/alex43dm/wifi-monitor.git
+cd wifi-monitor
+make
+cp wifi-monitor /usr/sbin
+cp wifi-monitor.service /etc/systemd/system
+systemctl enable /etc/systemd/system/wifi-monitor.service
+systemctl start wifi-monitor
+systemctl status wifi-monitor
+
