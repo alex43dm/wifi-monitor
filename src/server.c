@@ -16,7 +16,7 @@
 
 #include <pthread.h>
 
-#include "def.h"
+#include "config.h"
 
 #define MAX_CLIENTS 5
 #define MAX_BUFFER_LEN 1024
@@ -133,7 +133,11 @@ static int exec_cmd(char *cmd)
         return 1;
     }
 
-    fread(cmd, CMD_LEN, 1, pipe_fp);
+    int res = fread(cmd, CMD_LEN, 1, pipe_fp);
+    if(res)
+    {
+        syslog(LOG_DEBUG, "Cmd return: %s", cmd);
+    }
     pclose(pipe_fp);
 
     syslog(LOG_DEBUG, "Run cmd: %s done", cmd);
@@ -448,5 +452,9 @@ void create_server(const char *path)
 
 void stop_server()
 {
-    write(sock, "STOP\n", 7);
+    int res = write(sock, "STOP\n", 5);
+    if(res != 5)
+    {
+       syslog(LOG_ERR, "Write to socket");
+    }
 }

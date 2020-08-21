@@ -19,3 +19,7 @@ systemctl enable /etc/systemd/system/wifi-monitor.service
 systemctl start wifi-monitor
 systemctl status wifi-monitor
 
+autoreconf --install
+./configure
+make
+sudo make install

@@ -12,6 +12,8 @@
 #include <libgen.h>
 #include <sys/stat.h>
 
+#include "config.h"
+
 extern void create_server(const char *path);
 extern void stop_server();
 extern void destroy_socket();
@@ -68,12 +70,16 @@ static char *get_socket_file_name()
 
 void handle_signal(int sig)
 {
+    int res;
     if (sig == SIGINT)
     {
         syslog(LOG_DEBUG, "Stopping daemon");
         if (pid_fd != -1)
         {
-            lockf(pid_fd, F_ULOCK, 0);
+            if(lockf(pid_fd, F_ULOCK, 0) != 0)
+            {
+                syslog(LOG_ERR, "lockf");
+            }
             close(pid_fd);
         }
         char *pid_file = get_pid_file_name();
@@ -135,7 +141,10 @@ static void daemonize()
 
     char *home = get_home();
     home_dir_check(home);
-    chdir(home);
+    if(chdir(home) != 0)
+    {
+        syslog(LOG_ERR, "Cann't change home dir to: %s", home);
+    }
     free(home);
 
     for (fd = sysconf(_SC_OPEN_MAX); fd > 0; fd--)
@@ -163,7 +172,10 @@ static void daemonize()
         }
         syslog(LOG_INFO, "Pid file %s", buf);
         sprintf(buf, "%d\n", getpid());
-        write(pid_fd, buf, strlen(buf));
+        if(write(pid_fd, buf, strlen(buf)) != strlen(buf))
+        {
+            syslog(LOG_ERR, "Cann't write pid");
+        }
         free(buf);
     }
     else
