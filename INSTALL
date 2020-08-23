@@ -14,14 +14,12 @@ apt-get install autotools-dev
 
 git clone https://github.com/alex43dm/wifi-monitor.git
 cd wifi-monitor
+autoreconf --install
+./configure
 make
-cp wifi-monitor /usr/sbin
+cp src/wifi-monitor /usr/sbin
 cp wifi-monitor.service /etc/systemd/system
 systemctl enable /etc/systemd/system/wifi-monitor.service
 systemctl start wifi-monitor
 systemctl status wifi-monitor
 
-autoreconf --install
-./configure
-make
-sudo make install
