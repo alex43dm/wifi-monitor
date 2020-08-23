@@ -17,7 +17,7 @@ sys/socket.h sys/un.h sys/types.h arpa/inet.h stdlib.h glib.h NetworkManager.h p
 
 AC_PATH_PROG(PKG_CONFIG, pkg-config)
 
-PKG_CHECK_MODULES([NM], [libnm])
+PKG_CHECK_MODULES(NM, [libnm])
 AC_SUBST([NM_CFLAGS])
 AC_SUBST([NM_LIBS])
 
