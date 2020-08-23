@@ -13,7 +13,6 @@ config.h.in*
 config.log
 config.status
 configure
-configure.ac
 depcomp
 install-sh
 missing

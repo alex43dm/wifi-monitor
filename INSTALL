@@ -9,6 +9,7 @@ apt-get install network-manager
 apt-get install libnm-dev
 apt-get install iproute2
 apt-get install iw
+sudo apt-get install autotools-dev
 
 git clone https://github.com/alex43dm/wifi-monitor.git
 cd wifi-monitor
