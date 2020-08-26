@@ -395,7 +395,7 @@ void *handle_client(void *data)
                 len = snprintf(buf, MAX_BUFFER_LEN, "%s %d", iface, wifi_stoped);
                 if(send(*s, buf, len, 0) != len)
                 {
-                    syslog(LOG_ERR, "Filed send to peer");
+                    syslog(LOG_ERR, "Failed send to peer");
                 }
                 break;
             default:
