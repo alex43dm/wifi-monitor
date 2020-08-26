@@ -31,7 +31,7 @@ static const char *iface = NULL;
 static const char *ap = NULL;
 static int scanning = 0;
 static int wifi_stoped = 0;
-static pthread_t tid = 0;
+static pthread_t tid = 2;
 
 enum
 {
@@ -39,6 +39,7 @@ enum
     STOP_WIFI,
     START_SCAN,
     STOP_SCAN,
+    GET_WIFI_STATE,
     UNUSED
 } cmd;
 
@@ -64,6 +65,12 @@ int decode(const char *buf, int len)
         syslog(LOG_DEBUG, "STOP SCAN");
         return STOP_SCAN;
     }
+    else if (strncmp(buf, "GET_WIFI_STATE", len) == 0)
+    {
+        syslog(LOG_DEBUG, "GET WIFI STATE");
+        return GET_WIFI_STATE;
+    }
+
     return UNUSED;
 }
 
@@ -124,6 +131,49 @@ int nm_get_wifi()
     return 0;
 }
 
+int wifi_check_mode()
+{
+    char *buf = NULL;
+    buf = (char *)malloc(CMD_LEN);
+    if (!buf)
+    {
+        syslog(LOG_ERR, "Cann't alloc");
+        return 1;
+    }
+    snprintf(buf, CMD_LEN - 1, "/sys/class/net/%s/type", iface);
+    int fd;
+    fd = open(buf, O_RDONLY);
+    if (!fd)
+    {
+        syslog(LOG_ERR, "open: %s", buf);
+        free(buf);
+        return 1;
+    }
+
+    int res = read(fd, buf, CMD_LEN);
+
+    close(fd);
+
+    if (!res)
+    {
+        syslog(LOG_ERR, "read file: %d", res);
+        free(buf);
+        return 1;
+    }
+
+
+    res = strtol(buf, NULL, 10);
+    if (res != 803)
+    {
+        syslog(LOG_ERR, "wifi state: %d", res);
+        free(buf);
+        return 1;
+    }
+
+    free(buf);
+    return 0;
+}
+
 static int exec_cmd(char *cmd)
 {
     FILE *pipe_fp;
@@ -147,12 +197,15 @@ static int exec_cmd(char *cmd)
 
 int wifi(int flag)
 {
-    nm_get_wifi();
 
     if (!iface)
     {
-        syslog(LOG_ERR, "Can't obtain wifi device");
-        return 1;
+        nm_get_wifi();
+        if (!iface)
+        {
+            syslog(LOG_ERR, "Can't obtain wifi device");
+            return 1;
+        }
     }
 
     char *cmd = NULL;
@@ -175,7 +228,6 @@ int wifi(int flag)
             if (exec_cmd(cmd)) goto err;
             snprintf(cmd, CMD_LEN - 1, "%s device set %s managed on", NMCLI, iface);
             if (exec_cmd(cmd)) goto err;
-            wifi_stoped = 1;
         }
     }
     else
@@ -190,9 +242,10 @@ int wifi(int flag)
             if (exec_cmd(cmd)) goto err;
             snprintf(cmd, CMD_LEN - 1, "%s link set %s up", IP, iface);
             if (exec_cmd(cmd)) goto err;
-            wifi_stoped = 0;
         }
     }
+
+    wifi_stoped =  wifi_check_mode();
 
     free(cmd);
     return 0;
@@ -241,49 +294,6 @@ void *scan_routine(void *params)
     pthread_exit(NULL);
 }
 
-int wifi_check_mode()
-{
-    char *buf = NULL;
-    buf = (char *)malloc(CMD_LEN);
-    if (!buf)
-    {
-        syslog(LOG_ERR, "Cann't alloc");
-        return 1;
-    }
-    snprintf(buf, CMD_LEN - 1, "/sys/class/net/%s/type", iface);
-    int fd;
-    fd = open(buf, O_RDONLY);
-    if (!fd)
-    {
-        syslog(LOG_ERR, "open: %s", buf);
-        free(buf);
-        return 1;
-    }
-
-    int res = read(fd, buf, CMD_LEN);
-
-    close(fd);
-
-    if (!res)
-    {
-        syslog(LOG_ERR, "read file: %d", res);
-        free(buf);
-        return 1;
-    }
-
-
-    res = strtol(buf, NULL, 10);
-    if (res != 803)
-    {
-        syslog(LOG_ERR, "wifi state: %d", res);
-        free(buf);
-        return 1;
-    }
-
-    free(buf);
-    return 0;
-}
-
 int scan()
 {
     if (scanning)
@@ -307,8 +317,6 @@ int scan()
         syslog(LOG_ERR, "Can't wifi device not in monitor mode");
         return 1;
     }
-
-    scanning = 1;
 
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -349,8 +357,6 @@ void *handle_client(void *data)
 
     len = recv(*s, buf, MAX_BUFFER_LEN, 0);
 
-    close(*s);
-
     if (len <= 0)
     {
         if (errno == ENOENT)
@@ -377,16 +383,28 @@ void *handle_client(void *data)
                 wifi(0);
                 break;
             case START_SCAN:
-                scan();
+                if(!scan())
+                {
+                    scanning = 1;
+                }
                 break;
             case STOP_SCAN:
                 scanning = 0;
+                break;
+            case GET_WIFI_STATE:
+                len = snprintf(buf, MAX_BUFFER_LEN, "%s %d", iface, wifi_stoped);
+                if(send(*s, buf, len, 0) != len)
+                {
+                    syslog(LOG_ERR, "Filed send to peer");
+                }
                 break;
             default:
                 syslog(LOG_DEBUG, "Unknow command");
                 break;
         }
     }
+    close(*s);
+
     free(buf);
 err:
     free(data);
@@ -428,6 +446,8 @@ void create_server(const char *path)
         destroy_socket();
         exit(EXIT_FAILURE);
     }
+
+    nm_get_wifi();
 
     while (running)
     {
