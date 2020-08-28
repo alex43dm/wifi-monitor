@@ -427,7 +427,7 @@ void *handle_client(void *data)
                 scanning = 0;
                 break;
             case GET_WIFI_STATE:
-                len = snprintf(buf, MAX_BUFFER_LEN, "%s %d", iface, wifi_mode);
+                len = snprintf(buf, MAX_BUFFER_LEN, "%s %d %d", iface, wifi_mode, scanning);
                 if (send(*s, buf, len, 0) != len)
                 {
                     syslog(LOG_ERR, "Failed send to peer");
