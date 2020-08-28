@@ -15,11 +15,15 @@ apt-get install autotools-dev
 git clone https://github.com/alex43dm/wifi-monitor.git
 cd wifi-monitor
 autoreconf --install
+
+#enable debug mode by configure(default yes), to disable debug: $./configure --enable-debug=no
 ./configure
+
 make
 cp src/wifi-monitor /usr/sbin
 cp wifi-monitor.service /etc/systemd/system
 systemctl enable /etc/systemd/system/wifi-monitor.service
 systemctl start wifi-monitor
 systemctl status wifi-monitor
+
 
