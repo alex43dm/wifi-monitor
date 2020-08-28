@@ -30,7 +30,7 @@ static const char *path = NULL;
 static const char *iface = NULL;
 static const char *ap = NULL;
 static int scanning = 0;
-static int wifi_stoped = 0;
+static int wifi_mode = 1;
 static pthread_t tid = 2;
 
 enum
@@ -47,27 +47,37 @@ int decode(const char *buf, int len)
 {
     if (strncmp(buf, "START_WIFI", len) == 0)
     {
+#ifdef DEBUG
         syslog(LOG_DEBUG, "START WIFI");
+#endif
         return START_WIFI;
     }
     else if (strncmp(buf, "STOP_WIFI", len) == 0)
     {
+#ifdef DEBUG
         syslog(LOG_DEBUG, "STOP WIFI");
+#endif
         return STOP_WIFI;
     }
     else if (strncmp(buf, "START_SCAN", len) == 0)
     {
+#ifdef DEBUG
         syslog(LOG_DEBUG, "START SCAN");
+#endif
         return START_SCAN;
     }
     else if (strncmp(buf, "STOP_SCAN", len) == 0)
     {
+#ifdef DEBUG
         syslog(LOG_DEBUG, "STOP SCAN");
+#endif
         return STOP_SCAN;
     }
     else if (strncmp(buf, "GET_WIFI_STATE", len) == 0)
     {
+#ifdef DEBUG
         syslog(LOG_DEBUG, "GET WIFI STATE");
+#endif
         return GET_WIFI_STATE;
     }
 
@@ -112,7 +122,7 @@ int nm_get_wifi()
         return 1;
     }
 
-    syslog(LOG_DEBUG, "NetworkManager version: %s", nm_client_get_version (client));
+    syslog(LOG_INFO, "NetworkManager version: %s", nm_client_get_version (client));
 
     const GPtrArray *devices;
     devices = nm_client_get_devices (client);
@@ -122,7 +132,7 @@ int nm_get_wifi()
         if (NM_IS_DEVICE_WIFI (device))
         {
             wifi_device_info(device, &iface, &ap);
-            syslog(LOG_DEBUG, "Found wifi dev: %s AP: %s", iface, ap);
+            syslog(LOG_INFO, "Found wifi dev: %s AP: %s", iface, ap);
         }
     }
 
@@ -165,11 +175,19 @@ int wifi_check_mode()
     res = strtol(buf, NULL, 10);
     if (res != 803)
     {
-        syslog(LOG_ERR, "wifi state: %d", res);
+        if (res == 1)
+        {
+            syslog(LOG_INFO, "WIFI in managed mode");
+        }
+        else
+        {
+            syslog(LOG_ERR, "wifi state: %d", res);
+        }
         free(buf);
         return 1;
     }
 
+    syslog(LOG_INFO, "WIFI in monitor mode");
     free(buf);
     return 0;
 }
@@ -184,20 +202,20 @@ static int exec_cmd(char *cmd)
     }
 
     int res = fread(cmd, CMD_LEN, 1, pipe_fp);
-    if(res)
+    if (res)
     {
-        syslog(LOG_DEBUG, "Cmd return: %s", cmd);
+        syslog(LOG_ERR, "Cmd return: %s", cmd);
     }
     pclose(pipe_fp);
 
+#ifdef DEBUG
     syslog(LOG_DEBUG, "Run cmd: %s done", cmd);
-
+#endif
     return 0;
 }
 
 int wifi(int flag)
 {
-
     if (!iface)
     {
         nm_get_wifi();
@@ -218,7 +236,7 @@ int wifi(int flag)
 
     if (flag)
     {
-        if (wifi_stoped == 0)
+        if (wifi_mode != 1)
         {
             snprintf(cmd, CMD_LEN - 1, "%s link set %s down", IP, iface);
             if (exec_cmd(cmd)) goto err;
@@ -229,10 +247,14 @@ int wifi(int flag)
             snprintf(cmd, CMD_LEN - 1, "%s device set %s managed on", NMCLI, iface);
             if (exec_cmd(cmd)) goto err;
         }
+        else
+        {
+            syslog(LOG_ERR, "WIFI already in managed mode");
+        }
     }
     else
     {
-        if (wifi_stoped == 1)
+        if (wifi_mode != 0)
         {
             snprintf(cmd, CMD_LEN - 1, "%s device set %s managed off", NMCLI, iface);
             if (exec_cmd(cmd)) goto err;
@@ -243,9 +265,13 @@ int wifi(int flag)
             snprintf(cmd, CMD_LEN - 1, "%s link set %s up", IP, iface);
             if (exec_cmd(cmd)) goto err;
         }
+        else
+        {
+            syslog(LOG_ERR, "WIFI already in mmonitor mode");
+        }
     }
 
-    wifi_stoped =  wifi_check_mode();
+    wifi_mode =  wifi_check_mode();
 
     free(cmd);
     return 0;
@@ -260,8 +286,9 @@ void *scan_routine(void *params)
     FILE *pipe_fp;
     char *cmd = NULL;
 
+#ifdef DEBUG
     syslog(LOG_DEBUG, "Start scan routine");
-
+#endif
     cmd = (char *)malloc(CMD_LEN);
     if (!cmd)
     {
@@ -271,7 +298,9 @@ void *scan_routine(void *params)
 
     snprintf(cmd, CMD_LEN - 1, "%s -w dump -I 1 %s", AIRODUMP_NG, iface);
 
+#ifdef DEBUG
     syslog(LOG_DEBUG, "run cmd: %s", cmd);
+#endif
 
     if ((pipe_fp = popen(cmd, "w")) == NULL)
     {
@@ -284,13 +313,17 @@ void *scan_routine(void *params)
         sleep(1);
     }
 
+#ifdef DEBUG
     syslog(LOG_DEBUG, "stop scan");
+#endif
 
     fwrite("q\nq\n", 4, 1, pipe_fp);
     free(cmd);
     pclose(pipe_fp);
 
+#ifdef DEBUG
     syslog(LOG_DEBUG, "exit scan");
+#endif
     pthread_exit(NULL);
 }
 
@@ -345,9 +378,9 @@ void *handle_client(void *data)
     int *s = (int *) data;
     char *buf = NULL;
     int len = 0;
-
+#ifdef DEBUG
     syslog(LOG_DEBUG, "Starting communication with a client");
-
+#endif
     buf = (char *) calloc(1, MAX_BUFFER_LEN);
     if (!buf)
     {
@@ -373,7 +406,9 @@ void *handle_client(void *data)
     }
     else
     {
-//        syslog(LOG_DEBUG, "Incoming message: len:%d data:%s", len, buf);
+#ifdef DEBUG
+        syslog(LOG_DEBUG, "Incoming message: len:%d data:%s", len, buf);
+#endif
         switch (decode(buf, len))
         {
             case START_WIFI:
@@ -383,7 +418,7 @@ void *handle_client(void *data)
                 wifi(0);
                 break;
             case START_SCAN:
-                if(!scan())
+                if (!scan())
                 {
                     scanning = 1;
                 }
@@ -392,14 +427,14 @@ void *handle_client(void *data)
                 scanning = 0;
                 break;
             case GET_WIFI_STATE:
-                len = snprintf(buf, MAX_BUFFER_LEN, "%s %d", iface, wifi_stoped);
-                if(send(*s, buf, len, 0) != len)
+                len = snprintf(buf, MAX_BUFFER_LEN, "%s %d", iface, wifi_mode);
+                if (send(*s, buf, len, 0) != len)
                 {
                     syslog(LOG_ERR, "Failed send to peer");
                 }
                 break;
             default:
-                syslog(LOG_DEBUG, "Unknow command");
+                syslog(LOG_ERR, "Unknow command");
                 break;
         }
     }
@@ -408,7 +443,9 @@ void *handle_client(void *data)
     free(buf);
 err:
     free(data);
+#ifdef DEBUG
     syslog(LOG_DEBUG, "Communication with client ended");
+#endif
     pthread_exit(NULL);
 }
 
@@ -448,6 +485,7 @@ void create_server(const char *path)
     }
 
     nm_get_wifi();
+    wifi_mode =  wifi_check_mode();
 
     while (running)
     {
@@ -455,7 +493,9 @@ void create_server(const char *path)
         socklen_t len = sizeof(a);
         int *s = (int *)malloc( sizeof(int));
         *s = accept(sock, &a, &len);
+#ifdef DEBUG
         syslog(LOG_DEBUG, "Accept client: %d", *s);
+#endif
         if (*s < 0)
         {
             syslog(LOG_ERR, "Failed accepting client (%d: %s)", errno, strerror(errno));
@@ -473,8 +513,8 @@ void create_server(const char *path)
 void stop_server()
 {
     int res = write(sock, "STOP\n", 5);
-    if(res != 5)
+    if (res != 5)
     {
-       syslog(LOG_ERR, "Write to socket");
+        syslog(LOG_ERR, "Write to socket");
     }
 }

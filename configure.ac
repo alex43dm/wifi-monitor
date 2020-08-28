@@ -24,7 +24,20 @@ AC_SUBST([NM_LIBS])
 CFLAGS="$CFLAGS $NM_CFLAGS"
 LIBS="$LIBS $NM_LIBS"
 
-dnl AC_DEFINE(DEBUG, 1, [debug mode])
+AC_ARG_ENABLE(debug,
+AS_HELP_STRING([--enable-debug],
+               [enable debugging, default: yes]),
+[case "${enableval}" in
+             yes) debug=true ;;
+             no)  debug=false ;;
+             *)   AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+esac],
+[debug=true])
+
+if test x"$debug" = x"true"
+then
+    AC_DEFINE(DEBUG, 1, [debug mode])
+fi
 
 AC_PATH_PROG(NMCLI,nmcli)
 if test -z "$NMCLI"

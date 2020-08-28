@@ -76,7 +76,7 @@ void handle_signal(int sig)
         syslog(LOG_DEBUG, "Stopping daemon");
         if (pid_fd != -1)
         {
-            if(lockf(pid_fd, F_ULOCK, 0) != 0)
+            if (lockf(pid_fd, F_ULOCK, 0) != 0)
             {
                 syslog(LOG_ERR, "lockf");
             }
@@ -141,7 +141,7 @@ static void daemonize()
 
     char *home = get_home();
     home_dir_check(home);
-    if(chdir(home) != 0)
+    if (chdir(home) != 0)
     {
         syslog(LOG_ERR, "Cann't change home dir to: %s", home);
     }
@@ -172,7 +172,7 @@ static void daemonize()
         }
         syslog(LOG_INFO, "Pid file %s", buf);
         sprintf(buf, "%d\n", getpid());
-        if(write(pid_fd, buf, strlen(buf)) != strlen(buf))
+        if (write(pid_fd, buf, strlen(buf)) != strlen(buf))
         {
             syslog(LOG_ERR, "Cann't write pid");
         }
