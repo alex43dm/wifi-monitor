@@ -1,0 +1,6 @@
+#!/sbin/openrc-run
+
+pidfile="/run/wifi-monitor.pid"
+command="/usr/sbin/wifi-monitor"
+command_args="-d"
+
