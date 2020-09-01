@@ -195,6 +195,7 @@ void print_help(void)
 
 extern void scan_stop();
 
+#ifndef GTEST_HAS_PTHREAD
 int main(int argc, char *argv[])
 {
     static struct option long_options[] =
@@ -247,3 +248,4 @@ int main(int argc, char *argv[])
 
     return EXIT_SUCCESS;
 }
+#endif

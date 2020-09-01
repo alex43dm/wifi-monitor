@@ -4,11 +4,13 @@ AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 dnl AC_PREFIX_DEFAULT(sbin)
 
 AC_PROG_CC
+AC_PROG_CXX
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
  Makefile
  src/Makefile
+ tests/Makefile
 ])
 
 AC_CHECK_HEADERS([stdlib.h unistd.h syslog.h signal.h getopt.h string.h \
@@ -21,7 +23,10 @@ PKG_CHECK_MODULES(NM, [libnm])
 AC_SUBST([NM_CFLAGS])
 AC_SUBST([NM_LIBS])
 
+dnl PKG_CHECK_MODULES(GTEST, [gtest])
+
 CFLAGS="$CFLAGS $NM_CFLAGS"
+CXXFLAGS="$CXXFLAGS $NM_CFLAGS"
 LIBS="$LIBS $NM_LIBS"
 
 AC_ARG_ENABLE(debug,
@@ -71,5 +76,8 @@ then
 else
     AC_DEFINE_UNQUOTED(AIRODUMP_NG, "$ac_cv_path_AIRODUMP_NG", [airodump-ng path])
 fi
+
+export CXXFLAGS
+dnl export CFLAGS
 
 AC_OUTPUT

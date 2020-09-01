@@ -22,6 +22,13 @@
 #define MAX_BUFFER_LEN 1024
 #define CMD_LEN 1024
 
+static const char start_wifi[] = "START_WIFI";
+static const char stop_wifi[] = "STOP_WIFI";
+static const char start_scan[] = "START_SCAN";
+static const char stop_scan[] = "STOP_SCAN";
+static const char get_state[] = "GET_STATE";
+static const char set_kick_timeout[] = "SET_KICK_TIMEOUT";
+
 extern int running;
 extern void create_server(const char *path);
 
@@ -32,6 +39,7 @@ static const char *ap = NULL;
 static int scanning = 0;
 static int wifi_mode = 1;
 static pthread_t tid = 2;
+static int kick_timeout = 120;
 
 enum
 {
@@ -39,46 +47,54 @@ enum
     STOP_WIFI,
     START_SCAN,
     STOP_SCAN,
-    GET_WIFI_STATE,
+    GET_STATE,
+    SET_KICK_TIMEOUT,
     UNUSED
 } cmd;
 
 int decode(const char *buf, int len)
 {
-    if (strncmp(buf, "START_WIFI", len) == 0)
+    if (strncmp(buf, start_wifi, sizeof(start_wifi)) == 0)
     {
 #ifdef DEBUG
         syslog(LOG_DEBUG, "START WIFI");
 #endif
         return START_WIFI;
     }
-    else if (strncmp(buf, "STOP_WIFI", len) == 0)
+    else if (strncmp(buf, stop_wifi, sizeof(stop_wifi)) == 0)
     {
 #ifdef DEBUG
         syslog(LOG_DEBUG, "STOP WIFI");
 #endif
         return STOP_WIFI;
     }
-    else if (strncmp(buf, "START_SCAN", len) == 0)
+    else if (strncmp(buf, start_scan, sizeof(start_scan)) == 0)
     {
 #ifdef DEBUG
         syslog(LOG_DEBUG, "START SCAN");
 #endif
         return START_SCAN;
     }
-    else if (strncmp(buf, "STOP_SCAN", len) == 0)
+    else if (strncmp(buf, stop_scan, sizeof(stop_scan)) == 0)
     {
 #ifdef DEBUG
         syslog(LOG_DEBUG, "STOP SCAN");
 #endif
         return STOP_SCAN;
     }
-    else if (strncmp(buf, "GET_WIFI_STATE", len) == 0)
+    else if (strncmp(buf, get_state, sizeof(get_state)) == 0)
     {
 #ifdef DEBUG
-        syslog(LOG_DEBUG, "GET WIFI STATE");
+        syslog(LOG_DEBUG, "GET STATE");
 #endif
-        return GET_WIFI_STATE;
+        return GET_STATE;
+    }
+    else if (strncmp(buf, set_kick_timeout, sizeof(set_kick_timeout) - 1) == 0)
+    {
+#ifdef DEBUG
+        syslog(LOG_DEBUG, "SET_KICK_TIMEOUT");
+#endif
+        return SET_KICK_TIMEOUT;
     }
 
     return UNUSED;
@@ -96,7 +112,7 @@ static void wifi_device_info (NMDevice *device, const char **iface, const char *
             active_ssid = nm_access_point_get_ssid (active_ap);
             if (active_ssid)
             {
-                *ap = strdup(nm_utils_ssid_to_utf8 (g_bytes_get_data (active_ssid, NULL),
+                *ap = strdup(nm_utils_ssid_to_utf8 ((const guint8 *)g_bytes_get_data (active_ssid, NULL),
                                                     g_bytes_get_size (active_ssid)));
             }
         }
@@ -128,7 +144,7 @@ int nm_get_wifi()
     devices = nm_client_get_devices (client);
     for (guint i = 0; i < devices->len; i++)
     {
-        NMDevice *device = g_ptr_array_index (devices, i);
+        NMDevice *device = (NMDevice *)g_ptr_array_index (devices, i);
         if (NM_IS_DEVICE_WIFI (device))
         {
             wifi_device_info(device, &iface, &ap);
@@ -296,7 +312,7 @@ void *scan_routine(void *params)
         return NULL;
     }
 
-    snprintf(cmd, CMD_LEN - 1, "%s -w dump -I 1 %s", AIRODUMP_NG, iface);
+    snprintf(cmd, CMD_LEN - 1, "%s --berlin %d -w dump -I 1 %s", AIRODUMP_NG, kick_timeout, iface);
 
 #ifdef DEBUG
     syslog(LOG_DEBUG, "run cmd: %s", cmd);
@@ -426,11 +442,32 @@ void *handle_client(void *data)
             case STOP_SCAN:
                 scanning = 0;
                 break;
-            case GET_WIFI_STATE:
-                len = snprintf(buf, MAX_BUFFER_LEN, "%s %d %d", iface, wifi_mode, scanning);
+            case GET_STATE:
+                len = snprintf(buf, MAX_BUFFER_LEN, "%s %d %d %d", iface, wifi_mode, scanning, kick_timeout );
                 if (send(*s, buf, len, 0) != len)
                 {
                     syslog(LOG_ERR, "Failed send to peer");
+                }
+                break;
+            case SET_KICK_TIMEOUT:
+                if (len > sizeof(set_kick_timeout))
+                {
+                    int kt = strtol(buf + strlen(set_kick_timeout), NULL, 10);
+                    if (kt != kick_timeout)
+                    {
+                        kick_timeout = kt;
+                        syslog(LOG_ERR, "Kick TimeOut: %d", kick_timeout);
+
+                        if (scanning)
+                        {
+                            scanning = 0;
+                            sleep(1);
+                            if (!scan())
+                            {
+                                scanning = 1;
+                            }
+                        }
+                    }
                 }
                 break;
             default:
