@@ -17,6 +17,7 @@
 extern void create_server(const char *path);
 extern void stop_server();
 extern void destroy_socket();
+extern const char *iface;
 
 int running = 0;
 
@@ -200,9 +201,9 @@ int main(int argc, char *argv[])
 {
     static struct option long_options[] =
     {
-        {"home", required_argument, 0, 'H'},
         {"help", no_argument, 0, 'h'},
         {"daemon", no_argument, 0, 'd'},
+        {"interface", required_argument, 0, 'i'},
         {NULL, 0, 0, 0}
     };
     int value, option_index = 0;
@@ -210,7 +211,7 @@ int main(int argc, char *argv[])
 
     app_name = basename(argv[0]);
 
-    while ((value = getopt_long(argc, argv, "H:dh", long_options, &option_index)) != -1)
+    while ((value = getopt_long(argc, argv, "H:dhi:", long_options, &option_index)) != -1)
     {
         switch (value)
         {
@@ -221,6 +222,9 @@ int main(int argc, char *argv[])
             case '?':
                 print_help();
                 return EXIT_SUCCESS;
+            case 'i':
+                iface = optarg;
+                break;
             default:
                 print_help();
                 return EXIT_FAILURE;

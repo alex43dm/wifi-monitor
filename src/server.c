@@ -34,7 +34,7 @@ extern void create_server(const char *path);
 
 static int sock = 0;
 static const char *path = NULL;
-static const char *iface = NULL;
+const char *iface = NULL;
 static const char *ap = NULL;
 static int scanning = 0;
 static int wifi_mode = 1;
